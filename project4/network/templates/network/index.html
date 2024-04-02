@@ -1,0 +1,194 @@
+{% extends "network/layout.html" %}
+
+
+{% block body %}
+
+    <script>
+            
+        function openModal(id) {
+            const modal = document.getElementById(`editModal_${id}`);
+            modal.style.display = "block";
+        }
+                                        
+        function closeModal(id) {
+            const modal = document.getElementById(`editModal_${id}`);
+            modal.style.display = "none";
+        }
+
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function editPost(id){
+            var modal = document.getElementById(`editModal_${id}`);
+            const editValue = document.getElementById(`salveEdit_${id}`).value
+            const postID = id
+            const content = document.getElementById(`postContent_${id}`)
+            let csrftoken = getCookie('csrftoken')
+            
+            if (editValue == ''){
+                return
+            }
+
+            fetch(`editPost/${postID}`, {
+                method: "POST",
+                body: JSON.stringify({
+                    id: postID,
+                    content: editValue,
+                }),
+                headers: {"X-CSRFToken": csrftoken}
+            })
+            .then(response => response.json())
+            .then(result => {
+                modal.style.display = "none";
+                content.innerHTML = result.data;
+                console.log(`post id: ${postID} ` + result.message);
+            })
+            
+        }
+
+        function like_unlike(id, youLiked){
+            const postId = id
+            const btnLike = document.getElementById(`postId_${id}`)
+            let csrftoken = getCookie('csrftoken')
+            const postLikes = document.getElementById(`postLikes_${id}`)
+            var liked = localStorage.getItem(`liked_${postId}`);
+
+            btnLike.classList.remove('fa-thumbs-up')
+            btnLike.classList.remove('fa-thumbs-down')
+
+            if(typeof liked === 'undefined' || liked === null){
+                if(youLiked.indexOf(postId) >= 0){
+                    liked = true;
+                }else{
+                    liked = false;
+                }
+            }
+
+            
+
+            if(liked === "true"){
+                fetch(`unlikePost/${postId}`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        id: postId,
+                    }),
+                    headers: {"X-CSRFToken": csrftoken}
+                })
+                .then(response => response.json())
+                .then(result => {
+                    btnLike.classList.add('fa-thumbs-up')
+                    postLikes.innerHTML = "&#128151;" + result.list_size + " People liked this"
+                })
+                liked = false
+            }else {
+                fetch(`likePost/${postId}`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        id: postId,
+                    }),
+                    headers: {"X-CSRFToken": csrftoken}
+                })
+                .then(response => response.json())
+                .then(result => {
+                    btnLike.classList.add('fa-thumbs-down')
+                    postLikes.innerHTML = "&#128151;" + result.list_size + " People liked this"
+                })
+                liked = true
+            }
+
+            localStorage.setItem(`liked_${postId}`, JSON.stringify(liked));
+            console.log(liked)
+            
+        }
+    </script>
+
+    <h2 style="margin-left: 14px;">{{ title }}</h2>
+
+    {% if user.is_authenticated and post_form %}
+        <div class="card" style="margin: 10px;">
+            <div class="card-body">
+                <h4 class="card-title">New Post</h4>
+                <p class="card-text">
+                    <form action="{% url 'newPost' %}"  method="POST">
+                        {% csrf_token %}
+                        <div class="mb-2">
+                            {{ post_form }}
+                        </div>
+                        <input type="submit" value="Post" class="btn btn-primary btn-new-blue" style="float: height;">
+                    </form>
+                </p>
+            </div>
+        </div>
+    {% endif %}
+
+    {% for post in page_posts %}
+        <div class="card" style="margin: 10px;">
+            <div class="card-body">
+                <p class="card-text">
+                    <div class="comment-section mb-4">
+                        
+                        <h5 class="card-title" style="margin-bottom: 2px !important"><a href="{% url 'profile' userId=post.user.id %}">@{{ post.user}}</a></h5>
+                        <small>{{ post.post_date }}</small>
+                        <div class="single-comment mb-3">
+                            <div class="comment-text" id="postContent_{{ post.id}}" style="margin-top: 8px; font-style: italic;">
+                                {{ post.content }}    
+                            </div><br>
+                            <h6 id="postLikes_{{ post.id }}">&#128151; {{ post.likes}} People liked this</h6>
+
+                            {% if user.is_authenticated %}
+                                {% if user == post.user %}
+                                    <button id="editBtn" class="btn btn-primary" onclick="openModal({{ post.id }})">Edit</button>
+                                    <div id="editModal_{{ post.id }}" class="modal">
+                                        <div class="modal-content">
+                                            <h2 class="modal-title fs-5">Edit Post</h2>
+                                            <textarea name="modalContent" id="salveEdit_{{ post.id }}" rows="10" class="form-control">{{ post.content}}</textarea>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary modal-button" onclick="closeModal({{ post.id }})">Close</button>
+                                                <button type="button" class="btn btn-primary modal-button" onclick="editPost({{ post.id }})">Salve</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    {% if post.id in youLiked %}
+                                        <i onclick="like_unlike({{ post.id }}, {{ youLiked }})" id="postId_{{ post.id }}" class="fa fa-thumbs-down"></i>
+                                    {% else %}
+                                        <i onclick="like_unlike({{ post.id }}, {{ youLiked }})" id="postId_{{ post.id }}" class="fa fa-thumbs-up"></i>
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                                
+                        </div>
+                    
+                    </div>
+                </p>
+            </div>
+        </div>
+    {% endfor %}
+
+    <nav aria-label="Page navigation" >
+        <ul class="pagination justify-content-center">
+        
+            {% if page_posts.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_posts.previous_page_number }}">Previous</a></li>
+            {% endif %}
+            
+            {% if page_posts.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_posts.next_page_number }}">Next</a></li>
+            {% endif %}
+
+        </ul>
+    </nav>
+
+{% endblock %}
